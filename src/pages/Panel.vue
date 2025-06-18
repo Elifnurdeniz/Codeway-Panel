@@ -8,68 +8,126 @@
                 <table class="params-table">
                     <thead>
                         <tr>
+                            <th class="expander"></th>
                             <th class="table-header">Parameter Key</th>
                             <th class="table-header">Value</th>
                             <th class="table-header">Description</th>
                             <th class="table-header sort-header" @click="toggleSort">
                                 Create Date
-                                <span class="arrow">
-                                    {{ sortAsc ? '↓' : '↑' }}
-                                </span>
+                                <span class="arrow">{{ sortAsc ? '↓' : '↑' }}</span>
                             </th>
                             <th></th>
                         </tr>
                     </thead>
                     <tbody>
-                        <tr v-for="param in params" :key="param.id">
-                            <!-- KEY -->
-                            <td>
-                                <template v-if="editingId === param.id">
-                                    <input v-model="editModel.key" />
-                                </template>
-                                <template v-else>
-                                    {{ param.key }}
-                                </template>
-                            </td>
+                        <template v-for="param in params" :key="param.id">
+                            <tr>
+                                <!-- Expander -->
+                                <td class="expander">
+                                    <button @click="toggleExpand(param)">
+                                        {{ expandedRows.has(param.id) ? '▼' : '▶' }}
+                                    </button>
+                                </td>
 
-                            <!-- VALUE -->
-                            <td>
-                                <template v-if="editingId === param.id">
-                                    <input v-model="editModel.value" />
-                                </template>
-                                <template v-else>
-                                    {{ param.value }}
-                                </template>
-                            </td>
+                                <!-- KEY -->
+                                <td>
+                                    <template v-if="editingId === param.id">
+                                        <input v-model="editModel.key" />
+                                    </template>
+                                    <template v-else>
+                                        {{ param.key }}
+                                    </template>
+                                </td>
 
-                            <!-- DESCRIPTION -->
-                            <td>
-                                <template v-if="editingId === param.id">
-                                    <input v-model="editModel.description" />
-                                </template>
-                                <template v-else>
-                                    {{ param.description }}
-                                </template>
-                            </td>
+                                <!-- VALUE -->
+                                <td>
+                                    <template v-if="editingId === param.id">
+                                        <input v-model="editModel.value" />
+                                    </template>
+                                    <template v-else>
+                                        {{ param.value }}
+                                    </template>
+                                </td>
 
-                            <!-- DATE (read-only) -->
-                            <td>{{ param.date }}</td>
+                                <!-- DESCRIPTION -->
+                                <td>
+                                    <template v-if="editingId === param.id">
+                                        <input v-model="editModel.description" />
+                                    </template>
+                                    <template v-else>
+                                        {{ param.description }}
+                                    </template>
+                                </td>
 
-                            <!-- ACTIONS -->
-                            <td class="actions">
-                                <template v-if="editingId === param.id">
-                                    <button class="btn edit" @click="save(param)">Save</button>
-                                    <button class="btn delete" @click="cancel()">Cancel</button>
-                                </template>
-                                <template v-else>
-                                    <button class="btn edit" @click="startEdit(param)">Edit</button>
-                                    <button class="btn delete" @click="remove(param)">Delete</button>
-                                </template>
-                            </td>
-                        </tr>
+                                <!-- DATE -->
+                                <td>{{ param.date }}</td>
 
-                        <!-- “Add new” row (unchanged) -->
+                                <!-- ACTIONS -->
+                                <td class="actions">
+                                    <template v-if="editingId === param.id">
+                                        <button class="btn edit" @click="save(param)">Save</button>
+                                        <button class="btn delete" @click="cancel()">Cancel</button>
+                                    </template>
+                                    <template v-else>
+                                        <button class="btn edit" @click="startEdit(param)">Edit</button>
+                                        <button class="btn delete" @click="remove(param)">Delete</button>
+                                    </template>
+                                </td>
+                            </tr>
+
+                            <!-- Country‐specific Overrides -->
+                            <tr v-if="expandedRows.has(param.id)" class="override-row">
+                                <td colspan="6">
+                                    <table class="override-table">
+                                        <thead>
+                                            <tr>
+                                                <th>Country</th>
+                                                <th>Value</th>
+                                                <th>Actions</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <tr v-for="ov in overridesMap[param.id]" :key="param.id + '-' + ov.country">
+                                                <td>{{ ov.country }}</td>
+                                                <td>
+                                                    <template v-if="overrideEditing[param.id] === ov.country">
+                                                        <input v-model="overrideEditModel[param.id].value" />
+                                                    </template>
+                                                    <template v-else>
+                                                        {{ ov.value }}
+                                                    </template>
+                                                </td>
+                                                <td class="actions">
+                                                    <template v-if="overrideEditing[param.id] === ov.country">
+                                                        <button class="btn edit"
+                                                            @click="saveOverride(param, ov.country)">Save</button>
+                                                        <button class="btn delete"
+                                                            @click="cancelOverride(param)">Cancel</button>
+                                                    </template>
+                                                    <template v-else>
+                                                        <button class="btn edit"
+                                                            @click="startOverrideEdit(param, ov)">Edit</button>
+                                                        <button class="btn delete"
+                                                            @click="deleteOverride(param, ov.country)">Delete</button>
+                                                    </template>
+                                                </td>
+                                            </tr>
+                                            <!-- add new override -->
+                                            <tr class="new-override-row">
+                                                <td><input v-model="newOverride[param.id].country"
+                                                        placeholder="Country code" /></td>
+                                                <td><input v-model="newOverride[param.id].value" placeholder="Value" />
+                                                </td>
+                                                <td><button class="btn add" @click="addOverride(param)">Add</button>
+                                                </td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </td>
+                            </tr>
+                        </template>
                         <tr class="new-row">
+                            <td></td>
                             <td><input v-model="newParam.key" placeholder="New Parameter" /></td>
                             <td><input v-model="newParam.value" placeholder="Value" /></td>
                             <td colspan="2">
@@ -91,7 +149,13 @@
 
             <!-- mobile cards -->
             <div class="mobile-view">
-                <ParamCard v-for="param in params" :key="param.id" :param="param" @edit="startEdit" @delete="remove" />
+                <ParamCard v-for="param in params" :key="param.id" :param="param"
+                    :overrides="overridesMap[param.id] || []" :editingOverride="overrideEditing[param.id]"
+                    :overrideEditModel="overrideEditModel[param.id]" :newOverride="newOverride[param.id]"
+                    @load-overrides="loadOverrides" @start-override-edit="startOverrideEdit"
+                    @cancel-override="cancelOverride" @save-override="saveOverride" @delete-override="deleteOverride"
+                    @add-override="addOverride" @edit="startEdit" @delete="remove" />
+
                 <!-- “Add new” as a final card -->
                 <div class="param-card add-card">
                     <input v-model="newParam.key" placeholder="Parameter Key" />
@@ -118,21 +182,20 @@
 <script setup lang="ts">
 import PanelHeader from '../components/PanelHeader.vue'
 import ParamCard from '../components/ParamCard.vue'
-import { reactive, ref, computed } from 'vue'
+import { reactive, ref } from 'vue'
 
 
 import { onMounted } from 'vue'
 import {
     collection, getDocs,
     addDoc, deleteDoc, updateDoc, doc,
-    serverTimestamp
+    serverTimestamp, setDoc
 } from 'firebase/firestore'
 import {
     query,
     orderBy,
     limit,
     startAfter,
-    endBefore,
     QueryDocumentSnapshot
 } from 'firebase/firestore'
 import { db } from '../services/firebase'
@@ -146,28 +209,83 @@ type ParamType = {
     date: string
     rawDate: Date
 }
+interface Override { country: string; value: string }
 
 
 // sort state: true = ascending, false = descending
 const sortAsc = ref(true)
 const PAGE_SIZE = 10
-
 const pageCursors = ref<QueryDocumentSnapshot[]>([])
 const hasNext = ref(false)
 const hasPrev = ref(false)
 const currentPage = ref(0)    // zero-based page index
-
 // The params for the *current* page:
 const params = ref<ParamType[]>([])
 
 
-const sortedParams = computed(() => {
-    return [...params.value].sort((a, b) => {
-        const ta = new Date(a.date).getTime()
-        const tb = new Date(b.date).getTime()
-        return sortAsc.value ? ta - tb : tb - ta
+// overrides state
+const expandedRows = ref(new Set<string>())
+const overridesMap: Record<string, Override[]> = reactive({})
+const overrideEditing: Record<string, string | null> = reactive({})
+const overrideEditModel: Record<string, { value: string }> = reactive({})
+const newOverride: Record<string, { country: string; value: string }> = reactive({})
+
+// toggle row expansion & load overrides
+async function toggleExpand(p: ParamType) {
+    if (expandedRows.value.has(p.id)) {
+        expandedRows.value.delete(p.id)
+    } else {
+        expandedRows.value.add(p.id)
+        if (!overridesMap[p.id]) await loadOverrides(p)
+    }
+}
+async function loadOverrides(p: ParamType) {
+    const snap = await getDocs(collection(db, 'config_params', p.id, 'overrides'))
+    overridesMap[p.id] = snap.docs.map(d => ({ country: d.id, value: d.data().value }))
+    overrideEditing[p.id] = null
+    overrideEditModel[p.id] = { value: '' }
+    newOverride[p.id] = { country: '', value: '' }
+}
+function startOverrideEdit(p: ParamType, ov: Override) {
+    overrideEditing[p.id] = ov.country
+    overrideEditModel[p.id].value = ov.value
+}
+function cancelOverride(p: ParamType) {
+    overrideEditing[p.id] = null
+}
+async function saveOverride(p: ParamType, country: string) {
+    const m = overrideEditModel[p.id].value
+    await updateDoc(doc(db, 'config_params', p.id, 'overrides', country), { value: m, updatedAt: serverTimestamp() })
+    const arr = overridesMap[p.id]
+    const idx = arr.findIndex(o => o.country === country)
+    if (idx > -1) arr[idx].value = m
+    overrideEditing[p.id] = null
+}
+async function deleteOverride(p: ParamType, country: string) {
+    await deleteDoc(doc(db, 'config_params', p.id, 'overrides', country))
+    overridesMap[p.id] = overridesMap[p.id].filter(o => o.country !== country)
+}
+async function addOverride(p: ParamType) {
+    const nr = newOverride[p.id]
+    if (!nr.country || !nr.value) return
+    const cc = nr.country.toUpperCase()
+    await setDoc(doc(db, 'config_params', p.id, 'overrides', cc), {
+        value: nr.value,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp()
     })
-})
+    overridesMap[p.id].push({ country: cc, value: nr.value })
+    newOverride[p.id] = { country: '', value: '' }
+}
+
+
+// const sortedParams = computed(() => {
+//     return [...params.value].sort((a, b) => {
+//         const ta = new Date(a.date).getTime()
+//         const tb = new Date(b.date).getTime()
+//         return sortAsc.value ? ta - tb : tb - ta
+//     })
+// })
 
 // toggle sort order
 function toggleSort() {
@@ -336,6 +454,8 @@ function formatDate(d: Date): string {
     color: #ccc;
     display: flex;
     flex-direction: column;
+    width: 100%;
+    box-sizing: border-box;
 }
 
 .desktop-view {
@@ -412,6 +532,47 @@ function formatDate(d: Date): string {
     cursor: not-allowed;
 }
 
+/* Override table */
+.expander {
+    width: 2rem;
+}
+
+.expander button {
+    background: transparent;
+    border: none;
+    color: inherit;
+    cursor: pointer;
+}
+
+.override-row td {
+    padding: 0;
+    background: #252536;
+}
+
+.override-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 0.5rem 0;
+}
+
+.override-table th,
+.override-table td {
+    padding: 0.5rem;
+    border: 1px solid #2e2c3c;
+}
+
+.override-table input,
+.new-override-row input {
+    width: 100%;
+    box-sizing: border-box;
+    border: 1px solid #778BA3;
+    border-radius: 4px;
+    background: transparent;
+    color: #fff;
+    transition: border-color 0.2s;
+    padding: 0.5rem 0.75rem;
+    font-size: 0.75rem;
+}
 
 /* CONTENT */
 .panel-content {

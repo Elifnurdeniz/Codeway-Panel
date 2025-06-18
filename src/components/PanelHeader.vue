@@ -44,6 +44,8 @@ async function doLogout() {
   align-items: center;
   padding: 1rem;
   background: transparent;
+  width: 100%;
+  box-sizing: border-box;
 }
 .header-logo {
   height: 32px;
@@ -54,10 +56,11 @@ async function doLogout() {
   display: flex;
   align-items: center;
   cursor: pointer;
+  /* margin-left: auto; */
 }
 .user-email {
   color: #ccc;
-  margin-right: 0.5rem;
+  /* margin-right: 0.5rem; */
 }
 .user-icon {
   width: 24px;
