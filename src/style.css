@@ -1,10 +1,9 @@
 html, body {
   margin: 0;
-  padding: 0;
+  padding-left: 0.5rem;
   min-height: 100%;
-  /* your gradient on the page background */
   background: linear-gradient(to top, #1E1E26 0%, #1E1E2F 100%);
-  background-attachment: fixed;  /* <-- keep the gradient fixed in place */
+  background-attachment: fixed;
   font-family: 'Inter', sans-serif;
 }
 

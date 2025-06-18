@@ -1,117 +1,118 @@
 <template>
-  <div class="panel-page">
-    <PanelHeader />
+    <div class="panel-page">
+        <PanelHeader />
 
-    <main class="panel-content">
-      <!-- desktop table -->
-       <div class="desktop-view">
-        <table class="params-table">
-            <thead>
-            <tr>
-                <th class="table-header">Parameter Key</th>
-                <th class="table-header">Value</th>
-                <th class="table-header">Description</th>
-                <th
-                    class="table-header sort-header"
-                    @click="toggleSort"
-                    >
-                    Create Date
-                    <span class="arrow">
-                        {{ sortAsc ? '↓' : '↑' }}
-                    </span>
-                </th>
-                <th></th>
-            </tr>
-            </thead>
-            <tbody>
-            <tr v-for="param in sortedParams" :key="param.id">
-                <!-- KEY -->
-                <td>
-                <template v-if="editingId === param.id">
-                    <input v-model="editModel.key" />
-                </template>
-                <template v-else>
-                    {{ param.key }}
-                </template>
-                </td>
+        <main class="panel-content">
+            <!-- desktop table -->
+            <div class="desktop-view">
+                <table class="params-table">
+                    <thead>
+                        <tr>
+                            <th class="table-header">Parameter Key</th>
+                            <th class="table-header">Value</th>
+                            <th class="table-header">Description</th>
+                            <th class="table-header sort-header" @click="toggleSort">
+                                Create Date
+                                <span class="arrow">
+                                    {{ sortAsc ? '↓' : '↑' }}
+                                </span>
+                            </th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr v-for="param in params" :key="param.id">
+                            <!-- KEY -->
+                            <td>
+                                <template v-if="editingId === param.id">
+                                    <input v-model="editModel.key" />
+                                </template>
+                                <template v-else>
+                                    {{ param.key }}
+                                </template>
+                            </td>
 
-                <!-- VALUE -->
-                <td>
-                <template v-if="editingId === param.id">
-                    <input v-model="editModel.value" />
-                </template>
-                <template v-else>
-                    {{ param.value }}
-                </template>
-                </td>
+                            <!-- VALUE -->
+                            <td>
+                                <template v-if="editingId === param.id">
+                                    <input v-model="editModel.value" />
+                                </template>
+                                <template v-else>
+                                    {{ param.value }}
+                                </template>
+                            </td>
 
-                <!-- DESCRIPTION -->
-                <td>
-                <template v-if="editingId === param.id">
-                    <input v-model="editModel.description" />
-                </template>
-                <template v-else>
-                    {{ param.description }}
-                </template>
-                </td>
+                            <!-- DESCRIPTION -->
+                            <td>
+                                <template v-if="editingId === param.id">
+                                    <input v-model="editModel.description" />
+                                </template>
+                                <template v-else>
+                                    {{ param.description }}
+                                </template>
+                            </td>
 
-                <!-- DATE (read-only) -->
-                <td>{{ param.date }}</td>
+                            <!-- DATE (read-only) -->
+                            <td>{{ param.date }}</td>
 
-                <!-- ACTIONS -->
-                <td class="actions">
-                <template v-if="editingId === param.id">
-                    <button class="btn edit" @click="save(param)">Save</button>
-                    <button class="btn delete" @click="cancel()">Cancel</button>
-                </template>
-                <template v-else>
-                    <button class="btn edit"   @click="startEdit(param)">Edit</button>
-                    <button class="btn delete" @click="remove(param)">Delete</button>
-                </template>
-                </td>
-            </tr>
+                            <!-- ACTIONS -->
+                            <td class="actions">
+                                <template v-if="editingId === param.id">
+                                    <button class="btn edit" @click="save(param)">Save</button>
+                                    <button class="btn delete" @click="cancel()">Cancel</button>
+                                </template>
+                                <template v-else>
+                                    <button class="btn edit" @click="startEdit(param)">Edit</button>
+                                    <button class="btn delete" @click="remove(param)">Delete</button>
+                                </template>
+                            </td>
+                        </tr>
 
-            <!-- “Add new” row (unchanged) -->
-            <tr class="new-row">
-                <td><input v-model="newParam.key"        placeholder="New Parameter"    /></td>
-                <td><input v-model="newParam.value"      placeholder="Value"            /></td>
-                <td colspan="2">
-                    <input
-                    v-model="newParam.description"
-                    placeholder="New Description"
-                    />
-                </td>
-                <td class="actions">
-                <button class="btn add" @click="add()">Add</button>
-                </td>
-            </tr>
-            </tbody>
-        </table>
-       </div>
-      
+                        <!-- “Add new” row (unchanged) -->
+                        <tr class="new-row">
+                            <td><input v-model="newParam.key" placeholder="New Parameter" /></td>
+                            <td><input v-model="newParam.value" placeholder="Value" /></td>
+                            <td colspan="2">
+                                <input v-model="newParam.description" placeholder="New Description" />
+                            </td>
+                            <td class="actions">
+                                <button class="btn add" @click="add()">Add</button>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+                <div class="pager">
+                    <button @click="prevPage" :disabled="currentPage === 0">Prev</button>
+                    <span>Page {{ currentPage + 1 }}</span>
+                    <button @click="nextPage" :disabled="params.length < PAGE_SIZE">Next</button>
+                </div>
+            </div>
 
-      <!-- mobile cards -->
-      <div class="mobile-view">
-        <ParamCard
-          v-for="param in params"
-          :key="param.id"
-          :param="param"
-          @edit="startEdit"
-          @delete="remove"
-        />
-        <!-- “Add new” as a final card -->
-        <div class="param-card add-card">
-          <input v-model="newParam.key" placeholder="Parameter Key" />
-          <input v-model="newParam.value" placeholder="Value" />
-          <input v-model="newParam.description" placeholder="Description" />
-          <div class="actions">
-            <button class="btn add" @click="add()">Add</button>
-          </div>
-        </div>
-      </div>
 
-    </main>
-  </div>
+            <!-- mobile cards -->
+            <div class="mobile-view">
+                <ParamCard v-for="param in params" :key="param.id" :param="param" @edit="startEdit" @delete="remove" />
+                <!-- “Add new” as a final card -->
+                <div class="param-card add-card">
+                    <input v-model="newParam.key" placeholder="Parameter Key" />
+                    <input v-model="newParam.value" placeholder="Value" />
+                    <input v-model="newParam.description" placeholder="Description" />
+                    <div class="actions">
+                        <button class="btn add" @click="add()">Add</button>
+                    </div>
+                </div>
+                <div class="pager mobile-pager">
+                    <button @click="loadPage(currentPage - 1)" :disabled="!hasPrev">
+                        Prev
+                    </button>
+                    <span>Page {{ currentPage + 1 }}</span>
+                    <button @click="loadPage(currentPage + 1)" :disabled="!hasNext">
+                        Next
+                    </button>
+                </div>
+            </div>
+        </main>
+    </div>
 </template>
 
 <script setup lang="ts">
@@ -122,256 +123,374 @@ import { reactive, ref, computed } from 'vue'
 
 import { onMounted } from 'vue'
 import {
-  collection, getDocs,
-  addDoc, deleteDoc, updateDoc, doc,
-  serverTimestamp
+    collection, getDocs,
+    addDoc, deleteDoc, updateDoc, doc,
+    serverTimestamp
+} from 'firebase/firestore'
+import {
+    query,
+    orderBy,
+    limit,
+    startAfter,
+    endBefore,
+    QueryDocumentSnapshot
 } from 'firebase/firestore'
 import { db } from '../services/firebase'
 
 // Reactive array of parameters
-const params = ref<Array<{
-  id: string
-  key: string
-  value: string
-  description: string
-  date: string
-}>>([])
+type ParamType = {
+    id: string
+    key: string
+    value: string
+    description: string
+    date: string
+    rawDate: Date
+}
 
-// const params = ref<ParamType[]>([])
 
 // sort state: true = ascending, false = descending
 const sortAsc = ref(true)
+const PAGE_SIZE = 10
+
+const pageCursors = ref<QueryDocumentSnapshot[]>([])
+const hasNext = ref(false)
+const hasPrev = ref(false)
+const currentPage = ref(0)    // zero-based page index
+
+// The params for the *current* page:
+const params = ref<ParamType[]>([])
 
 
 const sortedParams = computed(() => {
-  return [...params.value].sort((a, b) => {
-    const ta = new Date(a.date).getTime()
-    const tb = new Date(b.date).getTime()
-    return sortAsc.value ? ta - tb : tb - ta
-  })
+    return [...params.value].sort((a, b) => {
+        const ta = new Date(a.date).getTime()
+        const tb = new Date(b.date).getTime()
+        return sortAsc.value ? ta - tb : tb - ta
+    })
 })
 
 // toggle sort order
 function toggleSort() {
-  sortAsc.value = !sortAsc.value
+    sortAsc.value = !sortAsc.value
+    pageCursors.value = []   // clear saved cursors
+    loadPage(0)
 }
 
-
-async function loadParams() {
-  const snap = await getDocs(collection(db, 'config_params'))
-  params.value = snap.docs.map(doc => {
-    const data = doc.data()
-    return {
-      id:          doc.id,
-      key:         data.key,
-      value:       data.value,
-      description: data.description,
-      date:        data.createdAt
-                     ? formatDate(data.createdAt.toDate()) : ''
+// Prev/Next handlers
+function prevPage() {
+    if (currentPage.value > 0) {
+        loadPage(currentPage.value - 1)
     }
-  })
+}
+function nextPage() {
+    // if we have exactly PAGE_SIZE items, we can try loading the next page
+    if (params.value.length === PAGE_SIZE) {
+        loadPage(currentPage.value + 1)
+    }
 }
 
-onMounted(loadParams)
+
+async function loadPage(idx: number) {
+    const dir = sortAsc.value ? 'asc' : 'desc'
+    const col = collection(db, 'config_params')
+    let q = query(col, orderBy('createdAt', dir), limit(PAGE_SIZE + 1))
+
+    // if we’re past the first page, start after that page’s cursor
+    if (idx > 0) {
+        q = query(
+            col,
+            orderBy('createdAt', dir),
+            startAfter(pageCursors.value[idx - 1]),
+            limit(PAGE_SIZE + 1)
+        )
+    }
+
+    const snap = await getDocs(q)
+    const docs = snap.docs
+
+    // if we got more than PAGE_SIZE, there *is* a next page
+    hasNext.value = docs.length === PAGE_SIZE + 1
+    hasPrev.value = idx > 0
+
+    // our real page slice is the first PAGE_SIZE docs
+    const pageDocs = docs.slice(0, PAGE_SIZE)
+    // record the cursor for this page (the last doc of the slice)
+    pageCursors.value[idx] = pageDocs[pageDocs.length - 1]
+
+    // map into your ParamType
+    params.value = pageDocs.map(d => {
+        const data = d.data() as any
+        const raw = data.createdAt.toDate()
+        return {
+            id: d.id,
+            key: data.key,
+            value: data.value,
+            description: data.description,
+            date: formatDate(raw),
+            rawDate: raw
+        }
+    })
+
+    currentPage.value = idx
+}
+
+onMounted(() => loadPage(0))
 
 const newParam = reactive({ key: '', value: '', description: '' })
 
 // for edit mode
-const editingId   = ref<string | null>(null)
-const editModel   = reactive({ key: '', value: '', description: '' })
+const editingId = ref<string | null>(null)
+const editModel = reactive({ key: '', value: '', description: '' })
 
 
 // start editing a row
 function startEdit(p: any) {
-  editingId.value = p.id
-  editModel.key         = p.key
-  editModel.value       = p.value
-  editModel.description = p.description
+    editingId.value = p.id
+    editModel.key = p.key
+    editModel.value = p.value
+    editModel.description = p.description
 }
 
 // cancel edit
 function cancel() {
-  editingId.value = null
+    editingId.value = null
 }
 
 // save changes back to Firestore + local state
 async function save(p: any) {
-  // write to Firestore
-  const refDoc = doc(db, 'config_params', p.id)
-  await updateDoc(refDoc, {
-    key:         editModel.key,
-    value:       editModel.value,
-    description: editModel.description,
-    updatedAt:   serverTimestamp()
-  })
+    const now = new Date()
+    // write to Firestore
+    const refDoc = doc(db, 'config_params', p.id)
+    await updateDoc(refDoc, {
+        key: editModel.key,
+        value: editModel.value,
+        description: editModel.description,
+        updatedAt: serverTimestamp()
+    })
 
-  // update local array
-  const idx = params.value.findIndex(x => x.id === p.id)
-  if (idx !== -1) {
-    params.value[idx].key         = editModel.key
-    params.value[idx].value       = editModel.value
-    params.value[idx].description = editModel.description
-    params.value[idx].date        = formatDate(new Date())
-  }
+    // update local array
+    const idx = params.value.findIndex(x => x.id === p.id)
+    if (idx !== -1) {
+        params.value[idx] = {
+            ...params.value[idx],
+            key: editModel.key,
+            value: editModel.value,
+            description: editModel.description,
+            date: formatDate(now),
+            rawDate: now
+        }
+    }
 
-  editingId.value = null
+    editingId.value = null
 }
 
 async function remove(p: { id: string }) {
-  // delete in Firestore
-  await deleteDoc(doc(db, 'config_params', p.id))
-  // update local state
-  params.value = params.value.filter(item => item.id !== p.id)
+    // delete in Firestore
+    await deleteDoc(doc(db, 'config_params', p.id))
+    // update local state
+    params.value = params.value.filter(item => item.id !== p.id)
 }
 
 
 async function add() {
-  if (!newParam.key || !newParam.value) return
-  // write to Firestore
-  const docRef = await addDoc(collection(db, 'config_params'), {
-    key:         newParam.key,
-    value:       newParam.value,
-    description: newParam.description,
-    createdAt:   serverTimestamp(),
-    updatedAt:   serverTimestamp(),
-    version:     0
-  })
-  // optimistically update local state
-  params.value.push({
-    id:          docRef.id,
-    key:         newParam.key,
-    value:       newParam.value,
-    description: newParam.description,
-    date:        formatDate(new Date())
-  })
-  // clear form
-  newParam.key = ''
-  newParam.value = ''
-  newParam.description = ''
+    if (!newParam.key || !newParam.value) return
+    const now = new Date()
+    // write to Firestore
+    const docRef = await addDoc(collection(db, 'config_params'), {
+        key: newParam.key,
+        value: newParam.value,
+        description: newParam.description,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+        version: 0
+    })
+    // optimistically update local state
+    params.value.push({
+        id: docRef.id,
+        key: newParam.key,
+        value: newParam.value,
+        description: newParam.description,
+        date: formatDate(new Date()),
+        rawDate: now
+    })
+    // clear form
+    newParam.key = ''
+    newParam.value = ''
+    newParam.description = ''
 }
 
 function formatDate(d: Date): string {
-  const dd = String(d.getDate()).padStart(2, '0')
-  const mm = String(d.getMonth() + 1).padStart(2, '0')
-  const yyyy = String(d.getFullYear())
-  const hh = String(d.getHours()).padStart(2, '0')
-  const min = String(d.getMinutes()).padStart(2, '0')
-  return `${dd}/${mm}/${yyyy} ${hh}:${min}`
+    const dd = String(d.getDate()).padStart(2, '0')
+    const mm = String(d.getMonth() + 1).padStart(2, '0')
+    const yyyy = String(d.getFullYear())
+    const hh = String(d.getHours()).padStart(2, '0')
+    const min = String(d.getMinutes()).padStart(2, '0')
+    return `${dd}/${mm}/${yyyy} ${hh}:${min}`
 }
 
 </script>
 
 <style scoped>
 .panel-page {
-  min-height: 100vh;
-  color: #ccc;
-  display: flex;
-  flex-direction: column;
+    min-height: 100vh;
+    color: #ccc;
+    display: flex;
+    flex-direction: column;
 }
 
-.desktop-view   { display: block; }
-.mobile-view    { display: none; }
+.desktop-view {
+    display: block;
+}
+
+.mobile-view {
+    display: none;
+}
 
 /* at mobile widths swap them */
 @media (max-width: 600px) {
-  .desktop-view { display: none; }
-  .mobile-view  { display: block; }
-  .panel-content { margin-left: 0.5rem; margin-right: 0.5rem; }
+    .desktop-view {
+        display: none;
+    }
+
+    .mobile-view {
+        display: block;
+    }
+
+    .panel-content {
+        margin-left: 0.5rem;
+        margin-right: 0.5rem;
+    }
 }
 
 /* MOBILE VIEW */
-.param-card, .add-card {
-  width: 100%;
-  padding: 0.5rem;
+.param-card,
+.add-card {
+    width: 100%;
+    padding: 0.5rem;
 }
 
 .add-card {
-  border-radius: 8px;
-  border: 1px solid #2e2c3c;
+    border-radius: 8px;
+    border: 1px solid #2e2c3c;
 }
 
 .add-card input {
-  width: 100%;
-  margin-bottom: 0.5rem;
-  padding: 0.5rem;
-  background: transparent;
-  border: 1px solid #2e2c3c;
-  /* border: none; */
-  border-radius: 4px;
-  color: #fff;
+    width: 100%;
+    margin-bottom: 0.5rem;
+    padding: 0.5rem;
+    background: transparent;
+    border: 1px solid #2e2c3c;
+    /* border: none; */
+    border-radius: 4px;
+    color: #fff;
 }
+
 .add-card .actions {
-  justify-content: flex-end;
+    justify-content: flex-end;
 }
+
+/* PAGING */
+.pager {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+    justify-content: center;
+    margin-top: 1rem;
+}
+
+.pager button {
+    padding: 0.5rem 1rem;
+    border: none;
+    background: #5069e3;
+    color: white;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.pager button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
 
 /* CONTENT */
 .panel-content {
-  flex: 1;
-  padding: 0.5rem;
+    flex: 1;
+    padding: 0.5rem;
 }
 
 /* TABLE */
-.params-table thead tr > th.table-header {
-  color:       #778BA3;
-  font-weight: 400;
-  font-size:   2rem; 
+.params-table thead tr>th.table-header {
+    color: #778BA3;
+    font-weight: 400;
+    font-size: 1.5rem;
 }
+
 .params-table {
-  width: 100%;
-  border-collapse: separate;
-  border-spacing: 0 0.25rem;
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0 0.25rem;
 }
+
 .params-table th,
 .params-table td {
-  padding: 0.5rem 1rem;
-  text-align: left;
+    padding: 0.5rem 1rem;
+    text-align: left;
 }
+
 .params-table thead th {
-  color: #888;
-  font-weight: 400;
-  font-size: 0.9rem;
+    color: #888;
+    font-weight: 400;
+    font-size: 0.9rem;
 }
+
 .params-table tbody td {
-  color: #ddd;
-  font-size: 0.95rem;
+    color: #ddd;
+    font-size: 0.9rem;
 }
 
 .sort-header {
-  cursor: pointer;
-  user-select: none;
+    cursor: pointer;
+    user-select: none;
 }
+
 .sort-header .arrow {
-  margin-left: 0.25rem;
-  font-size: 0.85em;
-  transition: transform 0.2s;
+    margin-left: 0.25rem;
+    font-size: 0.85em;
+    transition: transform 0.2s;
 }
-.sort-header.sorted-asc .arrow { transform: rotate(180deg); }
+
+.sort-header.sorted-asc .arrow {
+    transform: rotate(180deg);
+}
 
 /* ACTION BUTTONS */
 .actions {
-  display: flex;
-  gap: 0.5rem;
+    display: flex;
+    gap: 0.5rem;
 }
+
 .btn {
-  padding: 0.3rem 0.75rem;
-  border: none;
-  border-radius: 4px;
-  font-size: 0.85rem;
-  cursor: pointer;
+    padding: 0.3rem 0.75rem;
+    border: none;
+    border-radius: 4px;
+    font-size: 0.85rem;
+    cursor: pointer;
 }
 
 /* “Add new” row inputs */
 .new-row input {
-  width: 100%;
-  padding: 0.5rem 0.75rem;
-  font-size: 1rem;
-  border: 1px solid #778BA3;
-  border-radius: 4px;
-  background: transparent;
-  color: #fff;
-  transition: border-color 0.2s;
+    width: 100%;
+    padding: 0.5rem 0.75rem;
+    font-size: 1rem;
+    border: 1px solid #778BA3;
+    border-radius: 4px;
+    background: transparent;
+    color: #fff;
+    transition: border-color 0.2s;
 }
+
 .new-row input:focus {
-  border-color: #7a71e1;
+    border-color: #7a71e1;
 }
 </style>

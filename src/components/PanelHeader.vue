@@ -3,7 +3,8 @@
     <img src="../assets/codeway_icon.png" alt="Codeway" class="header-logo" />
 
     <div class="user-menu" @click="toggleDropdown">
-      <span class="user-email">{{ auth.user?.email || '—' }}</span>
+      <!-- <span class="user-email">{{ auth.user?.email || '—' }}</span> -->
+      <img src="../assets/user.png" alt="User" class="user-icon" />
       <span class="dropdown-arrow">▾</span>
 
       <div v-if="show" class="dropdown">
@@ -56,6 +57,11 @@ async function doLogout() {
 }
 .user-email {
   color: #ccc;
+  margin-right: 0.5rem;
+}
+.user-icon {
+  width: 24px;
+  height: 24px;
   margin-right: 0.5rem;
 }
 .dropdown-arrow {
