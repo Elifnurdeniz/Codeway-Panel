@@ -189,7 +189,7 @@ import { onMounted } from 'vue'
 import {
     collection, getDocs,
     addDoc, deleteDoc, updateDoc, doc,
-    serverTimestamp, setDoc
+    serverTimestamp, setDoc, runTransaction
 } from 'firebase/firestore'
 import {
     query,
@@ -208,6 +208,7 @@ type ParamType = {
     description: string
     date: string
     rawDate: Date
+    version?: number
 }
 interface Override { country: string; value: string }
 
@@ -338,7 +339,8 @@ async function loadPage(idx: number) {
             value: data.value,
             description: data.description,
             date: formatDate(raw),
-            rawDate: raw
+            rawDate: raw,
+            version: (data.version ?? 0)  
         }
     })
 
@@ -351,7 +353,7 @@ const newParam = reactive({ key: '', value: '', description: '' })
 
 // for edit mode
 const editingId = ref<string | null>(null)
-const editModel = reactive({ key: '', value: '', description: '' })
+const editModel = reactive({ key: '', value: '', description: '', version: 0 })
 
 
 // start editing a row
@@ -360,6 +362,7 @@ function startEdit(p: any) {
     editModel.key = p.key
     editModel.value = p.value
     editModel.description = p.description
+    editModel.version = p.version
 }
 
 // cancel edit
@@ -368,31 +371,53 @@ function cancel() {
 }
 
 // save changes back to Firestore + local state
-async function save(p: any) {
-    const now = new Date()
-    // write to Firestore
-    const refDoc = doc(db, 'config_params', p.id)
-    await updateDoc(refDoc, {
-        key: editModel.key,
-        value: editModel.value,
+async function save(p: ParamType) {
+  const refDoc = doc(db, 'config_params', p.id)
+
+  try {
+    await runTransaction(db, async tx => {
+      const snap = await tx.get(refDoc)
+      const serverVersion = snap.data()?.version ?? 0
+
+      if (serverVersion !== editModel.version) {
+        // somebody else beat you to it
+        throw new Error('VERSION_MISMATCH')
+      }
+
+      // safe to write
+      tx.update(refDoc, {
+        key:         editModel.key,
+        value:       editModel.value,
         description: editModel.description,
-        updatedAt: serverTimestamp()
+        version:     serverVersion + 1,
+        updatedAt:   serverTimestamp()
+      })
     })
 
-    // update local array
+    // if we get here, transaction committed
+    // update your local array too (and bump version)
     const idx = params.value.findIndex(x => x.id === p.id)
-    if (idx !== -1) {
-        params.value[idx] = {
-            ...params.value[idx],
-            key: editModel.key,
-            value: editModel.value,
-            description: editModel.description,
-            date: formatDate(now),
-            rawDate: now
-        }
+    const newVer = editModel.version + 1
+    params.value[idx] = {
+      ...params.value[idx],
+      key:         editModel.key,
+      value:       editModel.value,
+      description: editModel.description,
+      date:        formatDate(new Date()),
+      rawDate:     new Date(),
+      version:     newVer
     }
 
     editingId.value = null
+
+  } catch (err: any) {
+    if (err.message === 'VERSION_MISMATCH') {
+      alert('This row was changed by someone else.  Please reload before saving.')
+    } else {
+      console.error(err)
+      alert('Save failed; please try again.')
+    }
+  }
 }
 
 async function remove(p: { id: string }) {
