@@ -10,7 +10,13 @@ const PORT = process.env.PORT || 8080
 // Public endpoint: returns defaults only
 app.get('/v1/config', validateApiKey, async (req, res) => {
   try {
-    const json = await getConfig()
+    // Extract country from query parameters
+    const country = typeof req.query.country === 'string'
+      ? req.query.country
+      : undefined
+
+    // pass it through to your service
+    const json = await getConfig(country)
     res
       .set('Cache-Control', 'public, max-age=300')
       .json(json)

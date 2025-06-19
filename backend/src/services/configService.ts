@@ -3,49 +3,45 @@ import { db } from '../firebaseAdmin'
 
 /**
  * Fetches all config_params and returns a flat key→value map.
- * If `country` is provided, looks for overrides in config_params/{paramId}/overrides/{COUNTRY}.
+ * If `country` is provided, looks for overrides in
+ *   config_params/{paramId}/overrides where override.country === COUNTRY.
  */
 export async function getConfig(country?: string): Promise<Record<string, any>> {
   const result: Record<string, any> = {}
+  // 1️⃣ load all default params
   const snap = await db.collection('config_params').get()
   const countryCode = country?.toUpperCase()
 
-  for (const doc of snap.docs) {
-    const data = doc.data()
-    let val: any = data.value
+  // 2️⃣ in one go, fetch every override doc whose `country` field matches
+  const overrideMap: Record<string, any> = {}
+  if (countryCode) {
+    const oSnap = await db
+      .collectionGroup('overrides')
+      .where('country', '==', countryCode)
+      .get()
 
-    // if a country was specified, try to fetch an override
-    if (countryCode) {
-      const overrideSnap = await db
-        .collection('config_params')
-        .doc(doc.id)
-        .collection('overrides')
-        .doc(countryCode)
-        .get()
+    // build a map:  parentParamId → overrideValue
+    oSnap.docs.forEach(d => {
+      const parentId = d.ref.parent.parent!.id
+      overrideMap[parentId] = d.data().value
+    })
+  }
 
-      if (overrideSnap.exists) {
-        const overrideData = overrideSnap.data()
-        // use override value if present
-        if (overrideData && overrideData.value !== undefined) {
-          val = overrideData.value
-        }
-      }
-    }
+  // 3️⃣ assemble final result, preferring overrides
+  snap.docs.forEach(doc => {
+    let val: any = overrideMap[doc.id] ?? doc.data().value
 
-    // If it's a string, try to parse numbers & booleans
+    // coerce strings to number/boolean if applicable
     if (typeof val === 'string') {
-      // number? (integers or floats, including negatives)
       if (/^-?\d+(\.\d+)?$/.test(val)) {
         val = parseFloat(val)
-      }
-      // boolean?
-      else if (/^(true|false)$/i.test(val)) {
+      } else if (/^(true|false)$/i.test(val)) {
         val = val.toLowerCase() === 'true'
       }
     }
 
-    result[data.key] = val
-  }
+    result[doc.data().key] = val
+  })
 
   return result
 }

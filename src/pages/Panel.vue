@@ -140,9 +140,9 @@
                     </tbody>
                 </table>
                 <div class="pager">
-                    <button @click="prevPage" :disabled="currentPage === 0">Prev</button>
+                    <button @click="prevPage" :disabled="!hasPrev">Prev</button>
                     <span>Page {{ currentPage + 1 }}</span>
-                    <button @click="nextPage" :disabled="params.length < PAGE_SIZE">Next</button>
+                    <button @click="nextPage" :disabled="!hasNext">Next</button>
                 </div>
             </div>
 
@@ -270,6 +270,7 @@ async function addOverride(p: ParamType) {
     if (!nr.country || !nr.value) return
     const cc = nr.country.toUpperCase()
     await setDoc(doc(db, 'config_params', p.id, 'overrides', cc), {
+        country: cc, 
         value: nr.value,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp()
@@ -278,14 +279,6 @@ async function addOverride(p: ParamType) {
     newOverride[p.id] = { country: '', value: '' }
 }
 
-
-// const sortedParams = computed(() => {
-//     return [...params.value].sort((a, b) => {
-//         const ta = new Date(a.date).getTime()
-//         const tb = new Date(b.date).getTime()
-//         return sortAsc.value ? ta - tb : tb - ta
-//     })
-// })
 
 // toggle sort order
 function toggleSort() {
@@ -301,11 +294,11 @@ function prevPage() {
     }
 }
 function nextPage() {
-    // if we have exactly PAGE_SIZE items, we can try loading the next page
-    if (params.value.length === PAGE_SIZE) {
+    if (hasNext.value) {
         loadPage(currentPage.value + 1)
     }
 }
+
 
 
 async function loadPage(idx: number) {
@@ -435,6 +428,9 @@ async function add() {
     newParam.key = ''
     newParam.value = ''
     newParam.description = ''
+
+    // reload current page to refresh data
+    await loadPage(currentPage.value)
 }
 
 function formatDate(d: Date): string {
