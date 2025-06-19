@@ -180,16 +180,15 @@
 </template>
 
 <script setup lang="ts">
+
+
 import PanelHeader from '../components/PanelHeader.vue'
 import ParamCard from '../components/ParamCard.vue'
 import { reactive, ref } from 'vue'
 
-
 import { onMounted } from 'vue'
 import {
-    collection, getDocs,
-    addDoc, deleteDoc, updateDoc, doc,
-    serverTimestamp, setDoc, runTransaction
+    collection, getDocs
 } from 'firebase/firestore'
 import {
     query,
@@ -199,7 +198,7 @@ import {
     QueryDocumentSnapshot
 } from 'firebase/firestore'
 import { db } from '../services/firebase'
-
+import { getAuth } from 'firebase/auth'
 // Reactive array of parameters
 type ParamType = {
     id: string
@@ -208,11 +207,11 @@ type ParamType = {
     description: string
     date: string
     rawDate: Date
-    version?: number
+    version: number
 }
-interface Override { country: string; value: string }
+interface Override { country: string; value: string; version:number; }
 
-
+const BASE_URL = 'http://localhost:8080'
 // sort state: true = ascending, false = descending
 const sortAsc = ref(true)
 const PAGE_SIZE = 10
@@ -231,6 +230,13 @@ const overrideEditing: Record<string, string | null> = reactive({})
 const overrideEditModel: Record<string, { value: string }> = reactive({})
 const newOverride: Record<string, { country: string; value: string }> = reactive({})
 
+// helper to get a fresh Firebase ID token
+async function getIdToken() {
+  const user = getAuth().currentUser
+  if (!user) throw new Error("not logged in")
+  return await user.getIdToken(/* forceRefresh */ true)
+}
+
 // toggle row expansion & load overrides
 async function toggleExpand(p: ParamType) {
     if (expandedRows.value.has(p.id)) {
@@ -241,11 +247,18 @@ async function toggleExpand(p: ParamType) {
     }
 }
 async function loadOverrides(p: ParamType) {
-    const snap = await getDocs(collection(db, 'config_params', p.id, 'overrides'))
-    overridesMap[p.id] = snap.docs.map(d => ({ country: d.id, value: d.data().value }))
-    overrideEditing[p.id] = null
-    overrideEditModel[p.id] = { value: '' }
-    newOverride[p.id] = { country: '', value: '' }
+  const snap = await getDocs(collection(db, 'config_params', p.id, 'overrides'))
+  overridesMap[p.id] = snap.docs.map(d => {
+    const data = d.data() as { value: any; version?: number }
+    return {
+      country: d.id,
+      value:   data.value,
+      version: typeof data.version === 'number' ? data.version : 0
+    }
+  })
+  overrideEditing[p.id]   = null
+  overrideEditModel[p.id] = { value: '' }
+  newOverride[p.id]       = { country: '', value: '' }
 }
 function startOverrideEdit(p: ParamType, ov: Override) {
     overrideEditing[p.id] = ov.country
@@ -255,31 +268,105 @@ function cancelOverride(p: ParamType) {
     overrideEditing[p.id] = null
 }
 async function saveOverride(p: ParamType, country: string) {
-    const m = overrideEditModel[p.id].value
-    await updateDoc(doc(db, 'config_params', p.id, 'overrides', country), { value: m, updatedAt: serverTimestamp() })
-    const arr = overridesMap[p.id]
-    const idx = arr.findIndex(o => o.country === country)
-    if (idx > -1) arr[idx].value = m
-    overrideEditing[p.id] = null
+  const newValue = overrideEditModel[p.id].value
+  // grab the current version from your local map
+  const currentOverride = overridesMap[p.id].find(o => o.country === country)!
+  const payload = {
+    value:   newValue,
+    version: currentOverride.version
+  }
+
+  try {
+    const res = await fetch(
+      `${BASE_URL}/v1/config/${encodeURIComponent(p.id)}/overrides/${encodeURIComponent(country)}`,
+      {
+        method: 'PATCH',
+        headers: {
+          'x-api-key':     PUBLIC_API_KEY,
+          'Authorization': `Bearer ${await getIdToken()}`,
+          'Content-Type':  'application/json',
+        },
+        body: JSON.stringify(payload),
+      }
+    )
+
+    if (res.status === 204) {
+      // success: bump local value + version
+      const arr = overridesMap[p.id]
+      const idx = arr.findIndex(o => o.country === country)
+      arr[idx].value   = newValue
+      arr[idx].version!++  
+      overrideEditing[p.id] = null
+
+    } else if (res.status === 409) {
+      alert('Conflict: someone else updated that override—please reload and try again.')
+    } else {
+      // other error
+      let errMsg = res.statusText
+      if (res.headers.get('content-type')?.includes('application/json')) {
+        const err = await res.json().catch(() => ({}))
+        errMsg = err.error || JSON.stringify(err)
+      }
+      alert(`Update override failed: ${errMsg}`)
+    }
+
+  } catch (e) {
+    console.error(e)
+    alert('Network error while updating override')
+  }
 }
 async function deleteOverride(p: ParamType, country: string) {
-    await deleteDoc(doc(db, 'config_params', p.id, 'overrides', country))
+  // call your DELETE /v1/config/:paramId/overrides/:country endpoint
+  const res = await fetch(
+    `${BASE_URL}/v1/config/${encodeURIComponent(p.id)}/overrides/${encodeURIComponent(country)}`,
+    {
+      method: 'DELETE',
+      headers: {
+        'x-api-key':     PUBLIC_API_KEY,
+        'Authorization': `Bearer ${await getIdToken()}`,
+      },
+    }
+  )
+  if (res.status === 204) {
+    // success: remove it locally
     overridesMap[p.id] = overridesMap[p.id].filter(o => o.country !== country)
-}
-async function addOverride(p: ParamType) {
-    const nr = newOverride[p.id]
-    if (!nr.country || !nr.value) return
-    const cc = nr.country.toUpperCase()
-    await setDoc(doc(db, 'config_params', p.id, 'overrides', cc), {
-        country: cc, 
-        value: nr.value,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp()
-    })
-    overridesMap[p.id].push({ country: cc, value: nr.value })
-    newOverride[p.id] = { country: '', value: '' }
+  } else {
+    // failure: show error
+    let msg = res.statusText
+    const ct = res.headers.get('content-type') || ''
+    if (ct.includes('application/json')) {
+      const err = await res.json().catch(() => ({}))
+      msg = err.error || JSON.stringify(err)
+    }
+    alert(`Delete override failed: ${msg}`)
+  }
 }
 
+async function addOverride(p: ParamType) {
+  const nr = newOverride[p.id]
+  if (!nr.country || !nr.value) return
+  const country = nr.country.toUpperCase()
+  const res = await fetch(
+    `${BASE_URL}/v1/config/${p.id}/overrides`,
+    {
+      method:  'POST',
+      headers: {
+        'x-api-key':     PUBLIC_API_KEY,
+        'Authorization': `Bearer ${await getIdToken()}`,
+        'Content-Type':  'application/json',
+      },
+      body: JSON.stringify({ country, value: nr.value }),
+    }
+  )
+  if (res.status === 201) {
+    // server always creates version=0
+    overridesMap[p.id].push({ country, value: nr.value, version: 0 })
+    newOverride[p.id] = { country: '', value: '' }
+  } else {
+    const err = await res.json()
+    alert(`Add override failed: ${err.error||res.statusText}`)
+  }
+}
 
 // toggle sort order
 function toggleSort() {
@@ -350,7 +437,7 @@ async function loadPage(idx: number) {
 onMounted(() => loadPage(0))
 
 const newParam = reactive({ key: '', value: '', description: '' })
-
+const PUBLIC_API_KEY = import.meta.env.VITE_PUBLIC_API_KEY || '';
 // for edit mode
 const editingId = ref<string | null>(null)
 const editModel = reactive({ key: '', value: '', description: '', version: 0 })
@@ -371,92 +458,127 @@ function cancel() {
 }
 
 // save changes back to Firestore + local state
-async function save(p: ParamType) {
-  const refDoc = doc(db, 'config_params', p.id)
-
+async function save(p: any) {
   try {
-    await runTransaction(db, async tx => {
-      const snap = await tx.get(refDoc)
-      const serverVersion = snap.data()?.version ?? 0
-
-      if (serverVersion !== editModel.version) {
-        // somebody else beat you to it
-        throw new Error('VERSION_MISMATCH')
+    await fetch(
+      `${BASE_URL}/v1/config/${encodeURIComponent(p.key)}`,
+      {
+        method:  'PATCH',
+        headers: {
+          'x-api-key': PUBLIC_API_KEY,
+          'Authorization': `Bearer ${await getIdToken()}`,
+          'Content-Type':  'application/json',
+        },
+        body: JSON.stringify({
+          value:       editModel.value,
+          description: editModel.description,
+          version:     editModel.version,    // ← include it
+        })
       }
-
-      // safe to write
-      tx.update(refDoc, {
-        key:         editModel.key,
-        value:       editModel.value,
-        description: editModel.description,
-        version:     serverVersion + 1,
-        updatedAt:   serverTimestamp()
-      })
+    ).then(async res => {
+      if (res.status === 204) {
+        // success! bump local version too:
+        const idx = params.value.findIndex(x => x.id === p.id)
+        if (idx > -1) {
+          params.value[idx].version++
+          params.value[idx].value       = editModel.value
+          params.value[idx].description = editModel.description
+          params.value[idx].date        = formatDate(new Date())
+          params.value[idx].rawDate     = new Date()
+        }
+        editingId.value = null
+      }
+      else if (res.status === 409) {
+        alert('Conflict: Someone else updated that parameter—please reload and try again.')
+      }
+      else {
+        let errMsg = res.statusText
+        const ct = res.headers.get('content-type') || ''
+        if (ct.includes('application/json')) {
+        const err = await res.json()
+        errMsg = err.error || JSON.stringify(err)
+        }
+        alert(`Update failed: ${errMsg}`)
+      }
     })
-
-    // if we get here, transaction committed
-    // update your local array too (and bump version)
-    const idx = params.value.findIndex(x => x.id === p.id)
-    const newVer = editModel.version + 1
-    params.value[idx] = {
-      ...params.value[idx],
-      key:         editModel.key,
-      value:       editModel.value,
-      description: editModel.description,
-      date:        formatDate(new Date()),
-      rawDate:     new Date(),
-      version:     newVer
-    }
-
-    editingId.value = null
-
-  } catch (err: any) {
-    if (err.message === 'VERSION_MISMATCH') {
-      alert('This row was changed by someone else.  Please reload before saving.')
-    } else {
-      console.error(err)
-      alert('Save failed; please try again.')
-    }
+  } catch (e) {
+    console.error(e)
+    alert('Network error during update')
   }
 }
 
-async function remove(p: { id: string }) {
-    // delete in Firestore
-    await deleteDoc(doc(db, 'config_params', p.id))
-    // update local state
-    params.value = params.value.filter(item => item.id !== p.id)
-}
 
+async function remove(p: { id: string }) {
+  if (!confirm(`“${p.id}” will be deleted.`)) return
+
+  try {
+    const res = await fetch(
+      `${BASE_URL}/v1/config/${encodeURIComponent(p.id)}`,
+      {
+        method: 'DELETE',
+        headers: {
+          'x-api-key':    PUBLIC_API_KEY,
+          'Authorization': `Bearer ${await getIdToken()}`,
+        }
+      }
+    )
+
+    if (res.status === 204) {
+      // success — reload current page
+      await loadPage(currentPage.value)
+    }
+    else {
+      const err = await res.json().catch(() => ({}))
+      alert(`Delete failed: ${err.error || res.statusText}`)
+    }
+  }
+  catch (e) {
+    console.error(e)
+    alert('Network error during delete')
+  }
+}
 
 async function add() {
-    if (!newParam.key || !newParam.value) return
-    const now = new Date()
-    // write to Firestore
-    const docRef = await addDoc(collection(db, 'config_params'), {
-        key: newParam.key,
-        value: newParam.value,
-        description: newParam.description,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-        version: 0
-    })
-    // optimistically update local state
-    params.value.push({
-        id: docRef.id,
-        key: newParam.key,
-        value: newParam.value,
-        description: newParam.description,
-        date: formatDate(new Date()),
-        rawDate: now
-    })
-    // clear form
-    newParam.key = ''
-    newParam.value = ''
-    newParam.description = ''
+  if (!newParam.key || !newParam.value) return
 
-    // reload current page to refresh data
-    await loadPage(currentPage.value)
+  try {
+    const res = await fetch(
+      `${BASE_URL}/v1/config`,
+      {
+        method:  'POST',
+        headers: {
+          'x-api-key':    PUBLIC_API_KEY,
+          'Authorization': `Bearer ${await getIdToken()}`,
+          'Content-Type':  'application/json',
+        },
+        body: JSON.stringify({
+          key:         newParam.key,
+          value:       newParam.value,
+          description: newParam.description,
+        })
+      }
+    )
+
+    if (res.status === 201) {
+      // success – reload the current page of data
+      await loadPage(currentPage.value)
+
+      // clear form
+      newParam.key         = ''
+      newParam.value       = ''
+      newParam.description = ''
+    }
+    else {
+      const err = await res.json()
+      alert(`Add failed: ${err.error || res.statusText}`)
+    }
+  }
+  catch (e) {
+    console.error(e)
+    alert('Network error during add')
+  }
 }
+
 
 function formatDate(d: Date): string {
     const dd = String(d.getDate()).padStart(2, '0')

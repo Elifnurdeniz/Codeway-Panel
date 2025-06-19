@@ -32,7 +32,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 
 import { auth } from '../services/firebase'
@@ -53,8 +53,9 @@ async function onSubmit() {
       email.value,
       password.value
     )
-    // ③ optional: grab ID token for later API calls
-    // const idToken = await userCred.user.getIdToken()
+    // grab ID token for later API calls
+    const idToken = await userCred.user.getIdToken()
+    console.log('ID Token:', idToken)
 
     // ④ on success, go to your panel
     router.push('/')
