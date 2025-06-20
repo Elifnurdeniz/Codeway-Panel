@@ -4,7 +4,6 @@ import cors from 'cors'
 import { validateApiKey } from './middleware/validateApiKey'
 import { validateFirebaseIdToken } from './middleware/validateFirebaseIdToken'
 import { getConfig, addParam, updateParam, deleteParam, addOverride, updateOverride, deleteOverride, OverrideRecord } from './services/configService'
-import path from 'path'
 
 
 dotenv.config()
@@ -179,11 +178,6 @@ app.delete(
   }
 )
 
-app.use(express.static(path.join(__dirname, '../..', 'dist')))
-// any “unknown” GET should serve your index.html:
-app.get('*', (_req, res) => {
-  res.sendFile(path.join(__dirname, '../..', 'dist', 'index.html'))
-})
 
 
 app.listen(PORT, () => {
