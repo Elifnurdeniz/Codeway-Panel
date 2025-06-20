@@ -1,4 +1,4 @@
-# Codeway Panel
+![image](https://github.com/user-attachments/assets/a3a3a7fa-8b57-490e-93c9-d946893ebd72)# Codeway Panel
 
 A configuration management panel web application, with both desktop and mobile views, backed by a RESTful API and Firestore as storage.
 
@@ -125,7 +125,7 @@ cd Codeway-Panel
 cd backend
 npm install
 # copy .env.example → .env and fill in values
-# but your firestore service account json file to backend/ directory
+# but your firestore serviceAccountKey.json file to backend/ directory
 npm run build      # compiles TypeScript to dist/
 npm start          # starts Express on PORT
 ```
@@ -182,14 +182,118 @@ curl -H "x-api-key: your-super-secret-api-key" \
 
 ## Deployment
 
-*(TODO: fill in when you deploy to Heroku / DigitalOcean / GCP.)*
+Follow these steps to deploy both the frontend and backend on a single Ubuntu droplet.
+
+### Prerequisites
+
+On your Ubuntu 20.04+ Droplet, ensure you have:
+
+- **SSH access** as `root` (or a sudo‐user)
+- **Node.js** >= 16 & **npm**
+- `git`
+
+### 1. Connect To Your Droplet Console
+
+From the DigitalOcean UI or command line, connect to the console. From the command line, you can connect with:
+
+```bash
+ssh root@YOUR_DROPLET_IP
+```
+
+### 2. Install Node.js & npm
+
+```
+sudo apt update
+sudo apt install nodejs
+sudo apt install npm
+```
+
+Verify:
+```
+node --version
+npm --version
+```
+### 3. Clone the Repository
+
+```
+git clone https://github.com/Elifnurdeniz/Codeway-Panel.git
+// Also, available at Gitlab https://gitlab.com/elifnurdeniz/Codeway-Panel.git
+cd Codeway-Panel
+```
+
+### 4. Backend Setup & Deployment
+
+Open a new screen:
+```
+screen -S backend
+```
+
+Start installing packages:
+```
+cd backend
+npm install
+```
+
+Fill you .env file as in .env.example
+```
+vim .env
+```
+
+Create your serviceAccountKey.json file:
+```
+vim serviceAccountKey.json
+```
+
+In `src/index.ts`, change the cors origin to droplet's IP.
+```
+app.use(cors({
+  origin: 'http://YOUR_DROPLET_IP:5173',    // Change Here!
+  methods: ['GET','POST','PATCH','DELETE','OPTIONS'],
+  allowedHeaders: ['Content-Type','x-api-key','Authorization']
+}))
+```
+
+Build & run:
+
+```
+npm run build
+npm start 
+```
+Detach from the screen and continue with frontend deployment.
+
+### 5. Frontend Setup & Deployment
+Create a new screen:
+```
+screen -S frontend
+```
+
+Back in the repo root:
+```
+cd ..
+npm install
+```
+
+Configure your .env:
+```
+vim .env
+```
+
+For your `VITE_BASE_URL` field, be sure to include the right IP address (your droplet IP).
+
+Run the server:
+```
+npm run dev -- --host 0.0.0.0
+```
+
+The page will be available at `http://YOUR_DROPLET_IP:5173`. Your panel and API are now live 🎉
 
 ---
 
 ## Future Improvements
 
-* Add Jest unit & integration tests.
+* Add unit & integration tests.
 * Role‑based permissions (read vs write).
 * Audit log of changes.
+* Server locations could be selected closer to the main user population. 
 
 
