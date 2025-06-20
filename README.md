@@ -1,4 +1,4 @@
-![image](https://github.com/user-attachments/assets/a3a3a7fa-8b57-490e-93c9-d946893ebd72)# Codeway Panel
+# Codeway Panel
 
 A configuration management panel web application, with both desktop and mobile views, backed by a RESTful API and Firestore as storage.
 
