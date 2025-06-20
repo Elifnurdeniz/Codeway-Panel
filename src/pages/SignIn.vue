@@ -55,7 +55,7 @@ async function onSubmit() {
     )
     // grab ID token for later API calls
     const idToken = await userCred.user.getIdToken()
-    console.log('ID Token:', idToken)
+    //console.log('ID Token:', idToken)
 
     // ④ on success, go to your panel
     router.push('/')

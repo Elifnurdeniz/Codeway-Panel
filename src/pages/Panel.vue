@@ -211,7 +211,7 @@ type ParamType = {
 }
 interface Override { country: string; value: string; version:number; }
 
-const BASE_URL = 'http://localhost:8080'
+const BASE_URL = import.meta.env.VITE_BASE_URL || 'http://localhost:8000'
 // sort state: true = ascending, false = descending
 const sortAsc = ref(true)
 const PAGE_SIZE = 10
