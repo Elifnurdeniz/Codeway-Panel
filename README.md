@@ -80,9 +80,6 @@ A configuration management panel web application, with both desktop and mobile v
 ### Backend (`backend/.env`)
 
 ```dotenv
-# Path to your Firebase Admin SDK service account key (downloaded JSON)
-GOOGLE_APPLICATION_CREDENTIALS=./serviceAccountKey.json
-
 # A shared API key for client→API authorization
 PUBLIC_API_KEY=your-super-secret-api-key
 
@@ -128,6 +125,7 @@ cd Codeway-Panel
 cd backend
 npm install
 # copy .env.example → .env and fill in values
+# but your firestore service account json file to backend/ directory
 npm run build      # compiles TypeScript to dist/
 npm start          # starts Express on PORT
 ```
