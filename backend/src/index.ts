@@ -9,7 +9,7 @@ import { getConfig, addParam, updateParam, deleteParam, addOverride, updateOverr
 dotenv.config()
 const app = express()
 app.use(cors({
-  origin: 'http://localhost:5173',      // or '*' for any origin
+  origin: 'http://164.92.181.34:5173',      // or '*' for any origin
   methods: ['GET','POST','PATCH','DELETE','OPTIONS'],
   allowedHeaders: ['Content-Type','x-api-key','Authorization']
 }))
