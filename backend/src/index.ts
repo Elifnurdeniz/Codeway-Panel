@@ -1,39 +1,37 @@
 import express from 'express'
 import dotenv from 'dotenv'
 import cors from 'cors'
+import { wrap } from './utils/wrap'
 import { validateApiKey } from './middleware/validateApiKey'
 import { validateFirebaseIdToken } from './middleware/validateFirebaseIdToken'
-import { getConfig, addParam, updateParam, deleteParam, addOverride, updateOverride, deleteOverride, OverrideRecord } from './services/configService'
+import { addParam, updateParam, deleteParam, listParams } from './services/configService'
+import { addOverride, updateOverride, deleteOverride, listOverrides } from './services/overrideService'
 
 
 dotenv.config()
 const app = express()
 app.use(cors({
-  origin: 'http://164.92.181.34:5173',      // or '*' for any origin
+  origin: ['http://164.92.181.34:5173', 'http://localhost:5173'],      // or '*' for any origin
   methods: ['GET','POST','PATCH','DELETE','OPTIONS'],
   allowedHeaders: ['Content-Type','x-api-key','Authorization']
 }))
 const PORT = process.env.PORT || 8080
 app.use(express.json())
 
-// Public endpoint: returns defaults only
-app.get('/v1/config', validateApiKey, async (req, res) => {
-  try {
-    // Extract country from query parameters
-    const country = typeof req.query.country === 'string'
-      ? req.query.country
-      : undefined
 
-    // pass it through to your service
-    const json = await getConfig(country)
-    res
-      .set('Cache-Control', 'public, max-age=300')
-      .json(json)
-  } catch (err) {
-    console.error(err)
-    res.status(500).json({ error: 'Failed to fetch config' })
-  }
-})
+// returns all params with pagination
+app.get(
+  '/v1/config', 
+  validateFirebaseIdToken,
+  wrap(async (req, res) => {
+    const sort      = (req.query.sort === 'desc' ? 'desc' : 'asc') as 'asc' | 'desc'
+    const pageSize  = Number(req.query.pageSize) || 10
+    const cursor    = typeof req.query.cursor === 'string' ? req.query.cursor : undefined
+
+    const { items, nextCursor } = await listParams(sort, pageSize, cursor)
+    res.json({ items, nextCursor })
+  })
+)
 
 app.post('/v1/config',
   validateApiKey,
@@ -98,6 +96,16 @@ app.delete(
     await deleteParam(req.params.id)
     res.sendStatus(204)
   }
+)
+
+// List overrides for a specific config param
+app.get(
+  '/v1/config/:paramId/overrides',
+  validateFirebaseIdToken,
+  wrap(async (req, res) => {
+    const overrides = await listOverrides(req.params.paramId)
+    res.json(overrides)
+  })
 )
 
 // add override

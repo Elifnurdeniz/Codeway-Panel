@@ -15,8 +15,14 @@ const router = createRouter({
 })
 
 // global guard
-router.beforeEach((to) => {
+router.beforeEach(async (to, from, next) => {
   const auth = useAuthStore()
+
+    // wait for Firebase to finish restoring session
+  if (auth.initializing) {
+    await auth.waitForInit()
+  }
+
   if (to.meta.requiresAuth && !auth.user) {
     // not signed in → go to sign-in
     return { name: 'SignIn' }
@@ -25,6 +31,7 @@ router.beforeEach((to) => {
     // already signed in → go to panel
     return { name: 'Panel' }
   }
+  next() 
 })
 
 export default router

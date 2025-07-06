@@ -87,7 +87,7 @@
                                             </tr>
                                         </thead>
                                         <tbody>
-                                            <tr v-for="ov in overridesMap[param.id]" :key="param.id + '-' + ov.country">
+                                            <tr v-for="ov in overridesMap[param.id] || []" :key="param.id + '-' + ov.country">
                                                 <td>{{ ov.country }}</td>
                                                 <td>
                                                     <template v-if="overrideEditing[param.id] === ov.country">
@@ -187,17 +187,6 @@ import ParamCard from '../components/ParamCard.vue'
 import { reactive, ref } from 'vue'
 
 import { onMounted } from 'vue'
-import {
-    collection, getDocs
-} from 'firebase/firestore'
-import {
-    query,
-    orderBy,
-    limit,
-    startAfter,
-    QueryDocumentSnapshot
-} from 'firebase/firestore'
-import { db } from '../services/firebase'
 import { getAuth } from 'firebase/auth'
 // Reactive array of parameters
 type ParamType = {
@@ -215,7 +204,7 @@ const BASE_URL = import.meta.env.VITE_BASE_URL || 'http://localhost:8000'
 // sort state: true = ascending, false = descending
 const sortAsc = ref(true)
 const PAGE_SIZE = 10
-const pageCursors = ref<QueryDocumentSnapshot[]>([])
+const pageCursors = ref<string[]>([])
 const hasNext = ref(false)
 const hasPrev = ref(false)
 const currentPage = ref(0)    // zero-based page index
@@ -239,27 +228,28 @@ async function getIdToken() {
 
 // toggle row expansion & load overrides
 async function toggleExpand(p: ParamType) {
-    if (expandedRows.value.has(p.id)) {
-        expandedRows.value.delete(p.id)
-    } else {
-        expandedRows.value.add(p.id)
-        if (!overridesMap[p.id]) await loadOverrides(p)
+  if (expandedRows.value.has(p.id)) {
+    expandedRows.value.delete(p.id)
+  } else {
+    expandedRows.value.add(p.id)
+    // only fetch if we haven't loaded anything yet
+    if (!overridesMap[p.id]?.length) {
+      await loadOverrides(p)
     }
+  }
 }
 async function loadOverrides(p: ParamType) {
-  const snap = await getDocs(collection(db, 'config_params', p.id, 'overrides'))
-  overridesMap[p.id] = snap.docs.map(d => {
-    const data = d.data() as { value: any; version?: number }
-    return {
-      country: d.id,
-      value:   data.value,
-      version: typeof data.version === 'number' ? data.version : 0
+  const res = await fetch(`${BASE_URL}/v1/config/${encodeURIComponent(p.id)}/overrides`, {
+    headers: {
+      'Authorization': `Bearer ${await getIdToken()}`
     }
   })
+  overridesMap[p.id] = await res.json() as Override[]
   overrideEditing[p.id]   = null
   overrideEditModel[p.id] = { value: '' }
   newOverride[p.id]       = { country: '', value: '' }
 }
+
 function startOverrideEdit(p: ParamType, ov: Override) {
     overrideEditing[p.id] = ov.country
     overrideEditModel[p.id].value = ov.value
@@ -387,51 +377,49 @@ function nextPage() {
     }
 }
 
-
-
+// Load the specified page of parameters
 async function loadPage(idx: number) {
-    const dir = sortAsc.value ? 'asc' : 'desc'
-    const col = collection(db, 'config_params')
-    let q = query(col, orderBy('createdAt', dir), limit(PAGE_SIZE + 1))
-
-    // if we’re past the first page, start after that page’s cursor
-    if (idx > 0) {
-        q = query(
-            col,
-            orderBy('createdAt', dir),
-            startAfter(pageCursors.value[idx - 1]),
-            limit(PAGE_SIZE + 1)
-        )
+  const sort    = sortAsc.value ? 'asc' : 'desc'
+  const cursor  = pageCursors.value[idx - 1]  // your local cursor array of IDs
+  const qs = new URLSearchParams({
+    sort,
+    pageSize: PAGE_SIZE.toString(),
+    ...(cursor ? { cursor } : {})
+  })
+  const res = await fetch(`${BASE_URL}/v1/config?${qs}`, {
+    headers: {
+      'Authorization': `Bearer ${await getIdToken()}`
     }
+  })
+  const body = await res.json() as { items: any[]; nextCursor?: string }
 
-    const snap = await getDocs(q)
-    const docs = snap.docs
+  // items → your ParamType[]
+  params.value = body.items.map(i => ({
+    id:       i.id,
+    key:      i.key,
+    value:    i.value,
+    description: i.description,
+    date:     new Date(i.createdAt).toLocaleString(),
+    rawDate:  new Date(i.createdAt),
+    version:  i.version
+  }))
 
-    // if we got more than PAGE_SIZE, there *is* a next page
-    hasNext.value = docs.length === PAGE_SIZE + 1
-    hasPrev.value = idx > 0
+  //for each param ensure overridesMap[param.id] is at least []  
+  params.value.forEach(p => {
+    if (!(p.id in overridesMap)) {
+      overridesMap[p.id] = []
+      overrideEditing[p.id] = null
+      overrideEditModel[p.id] = { value: '' }
+      newOverride[p.id] = { country: '', value: '' }
+    }
+  })
 
-    // our real page slice is the first PAGE_SIZE docs
-    const pageDocs = docs.slice(0, PAGE_SIZE)
-    // record the cursor for this page (the last doc of the slice)
-    pageCursors.value[idx] = pageDocs[pageDocs.length - 1]
+  hasPrev.value = idx > 0
+  hasNext.value = !!body.nextCursor
 
-    // map into your ParamType
-    params.value = pageDocs.map(d => {
-        const data = d.data() as any
-        const raw = data.createdAt.toDate()
-        return {
-            id: d.id,
-            key: data.key,
-            value: data.value,
-            description: data.description,
-            date: formatDate(raw),
-            rawDate: raw,
-            version: (data.version ?? 0)  
-        }
-    })
-
-    currentPage.value = idx
+  // save the cursor for page `idx`
+  pageCursors.value[idx] = body.nextCursor!
+  currentPage.value = idx
 }
 
 onMounted(() => loadPage(0))

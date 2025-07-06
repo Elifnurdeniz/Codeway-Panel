@@ -1,29 +1,32 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { auth } from '../services/firebase'
-import { onAuthStateChanged, signOut } from 'firebase/auth'
+import {
+  onAuthStateChanged,
+  signOut,
+  setPersistence,
+  browserLocalPersistence
+} from 'firebase/auth'
+import type { User } from 'firebase/auth'
 import router from '../router'
 
 export const useAuthStore = defineStore('auth', () => {
-  const user = ref(auth.currentUser)
-  let timer: ReturnType<typeof setTimeout> | null = null
-  const TIMEOUT = 1000 * 60 * 60  // 1 hour
+  // 1️⃣ state
+  const user         = ref<User|null>(null)
+  const initializing = ref(true)
+  let   initResolve: () => void
+  const initPromise = new Promise<void>(r => { initResolve = r })
 
-  // reset or start inactivity timer
+  // inactivity timer
+  let timer: ReturnType<typeof setTimeout>|null = null
+  const TIMEOUT = 1000 * 60 * 60  // 1h
+
   function resetTimer() {
     if (timer) clearTimeout(timer)
     if (user.value) {
-      timer = setTimeout(() => {
-        doLogout()
-      }, TIMEOUT)
+      timer = setTimeout(doLogout, TIMEOUT)
     }
   }
-
-  // watch Firebase auth state
-  onAuthStateChanged(auth, (u) => {
-    user.value = u
-    resetTimer()
-  })
 
   async function doLogout() {
     if (timer) clearTimeout(timer)
@@ -32,5 +35,28 @@ export const useAuthStore = defineStore('auth', () => {
     router.push({ name: 'SignIn' })
   }
 
-  return { user, resetTimer, doLogout }
+  // 2️⃣ set persistence _before_ any sign-in happens
+  setPersistence(auth, browserLocalPersistence)
+    .catch(err => console.error('Persist failed', err))
+
+  // 3️⃣ watch auth state
+  onAuthStateChanged(auth, u => {
+    user.value = u
+    resetTimer()
+    if (initializing.value) {
+      initializing.value = false
+      initResolve()
+    }
+  })
+
+  // 4️⃣ let the router wait for that first restore
+  function waitForInit() { return initPromise }
+
+  return {
+    user,
+    initializing,
+    waitForInit,
+    resetTimer,
+    doLogout
+  }
 })
