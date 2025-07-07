@@ -474,7 +474,7 @@ async function save(p: any) {
           params.value[idx].version++
           params.value[idx].value       = editModel.value
           params.value[idx].description = editModel.description
-          params.value[idx].date        = formatDate(new Date())
+          params.value[idx].date        = new Date().toLocaleString()
           params.value[idx].rawDate     = new Date()
         }
         editingId.value = null
@@ -737,28 +737,39 @@ function formatDate(d: Date): string {
     font-weight: 400;
     font-size: 1.5rem;
 }
-
 .params-table {
     width: 100%;
     border-collapse: separate;
     border-spacing: 0 0.25rem;
 }
-
 .params-table th,
 .params-table td {
     padding: 0.5rem 1rem;
     text-align: left;
 }
-
 .params-table thead th {
     color: #888;
     font-weight: 400;
     font-size: 0.9rem;
 }
-
 .params-table tbody td {
     color: #ddd;
     font-size: 0.9rem;
+}
+.params-table td input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.9rem;             /* match your table font */
+  border: 1px solid #778BA3;     /* same border color */
+  border-radius: 4px;
+  background: transparent;
+  color: #fff;
+  transition: border-color 0.2s;
+}
+.params-table td input:focus {
+  border-color: #7a71e1;         /* same focus style as new-row */
+  outline: none;
 }
 
 .sort-header {
