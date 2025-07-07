@@ -81,6 +81,7 @@
                                     <table class="override-table">
                                         <thead>
                                             <tr>
+                                                <th class="expander"></th>
                                                 <th>Country</th>
                                                 <th>Value</th>
                                                 <th>Actions</th>
@@ -88,7 +89,8 @@
                                         </thead>
                                         <tbody>
                                             <tr v-for="ov in overridesMap[param.id] || []" :key="param.id + '-' + ov.country">
-                                                <td>{{ ov.country }}</td>
+                                              <td></td>  
+                                              <td>{{ ov.country }}</td>
                                                 <td>
                                                     <template v-if="overrideEditing[param.id] === ov.country">
                                                         <input v-model="overrideEditModel[param.id].value" />
@@ -114,6 +116,7 @@
                                             </tr>
                                             <!-- add new override -->
                                             <tr class="new-override-row">
+                                                <td></td>
                                                 <td><input v-model="newOverride[param.id].country"
                                                         placeholder="Country code" /></td>
                                                 <td><input v-model="newOverride[param.id].value" placeholder="Value" />
@@ -690,6 +693,23 @@ function formatDate(d: Date): string {
 .override-table td {
     padding: 0.5rem;
     border: 1px solid #2e2c3c;
+}
+.override-table td:nth-child(1),
+.override-table th:nth-child(1) {
+  width: 0%;
+}
+.override-table td:nth-child(2),
+.override-table th:nth-child(2) {
+  width: 40%;
+}
+
+.override-table td:nth-child(3),
+.override-table th:nth-child(3) {
+  width: 40%;
+}
+
+.override-table td:nth-child(4){
+  width: 20%;
 }
 
 .override-table input,
